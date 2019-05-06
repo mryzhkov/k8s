@@ -1,0 +1,6 @@
+[masters]
+k8s-master ansible_host=10.127.20.64 ansible_user=root
+[workers]
+k8s-worker1 ansible_host=10.127.20.65 ansible_user=root
+k8s-worker2 ansible_host=10.127.20.76 ansible_user=root
+

@@ -1,0 +1,24 @@
+kind: ConfigMap
+apiVersion: v1
+metadata:
+  name: alertmanager
+  namespace: monitoring
+data:
+  config.yml: |-
+    global:
+      resolve_timeout: 5m
+      slack_api_url: "https://hooks.slack"
+    templates:
+    - '/etc/alertmanager-templates/*.tmpl'
+    route:
+      receiver: 'slack'
+
+    receivers:
+    - name: 'slack'
+      slack_configs:
+          - send_resolved: true
+            username: 'user'
+            channel: 'channel'
+            api_url: 'https://hooks.slack'
+            title: "{{ range .Alerts }}{{ .Annotations.summary }}{{ .Labels.severity }}\n{{ end }}"
+            text:  "{{ range .Alerts }}{{ .Annotations.description }}\n{{ end }}"
