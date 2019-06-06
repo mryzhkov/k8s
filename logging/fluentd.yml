@@ -1,0 +1,91 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: fluentd-logging
+  namespace: logging
+  labels:
+    app: fluentd-logging
+---
+kind: ClusterRole
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: fluentd-logging
+  labels:
+    app: fluentd-logging
+rules:
+- apiGroups:
+  - ""
+  resources:
+  - "namespaces"
+  - "pods"
+  verbs:
+  - "get"
+  - "watch"
+  - "list"
+---
+kind: ClusterRoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: fluentd-logging
+  labels:
+    app: fluentd-logging
+subjects:
+- kind: ServiceAccount
+  name: fluentd-logging
+  namespace: logging
+  apiGroup: ""
+roleRef:
+  kind: ClusterRole
+  name: fluentd-logging
+  apiGroup: ""
+---
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: fluentd-logging
+  namespace: logging
+  labels:
+    app: fluentd-logging
+spec:
+  selector:
+    matchLabels:
+      app: fluentd-logging
+  template:
+    metadata:
+      labels:
+        app: fluentd-logging
+    spec:
+      serviceAccountName: fluentd-logging
+      containers:
+      - name: fluentd-logging
+        image: fluent/fluent-bit:1.1.2
+        env:
+        - name: FLUENT_ELASTICSEARCH_HOST
+          value: "elasticsearch-logging"
+        - name: FLUENT_ELASTICSEARCH_PORT
+          value: "9200"
+        resources:
+          limits:
+            memory: 500Mi
+          requests:
+            cpu: 100m
+            memory: 250Mi
+        volumeMounts:
+        - name: varlog
+          mountPath: /var/log
+        - name: varlibdockercontainers
+          mountPath: /var/lib/docker/containers
+          readOnly: true
+        - name: config-volume
+          mountPath: /fluent-bit/etc/
+      terminationGracePeriodSeconds: 30
+      volumes:
+      - name: varlog
+        hostPath:
+          path: /var/log
+      - name: varlibdockercontainers
+        hostPath:
+          path: /var/lib/docker/containers
+      - name: config-volume
+        configMap:
+          name: fluentd-configmap

@@ -17,8 +17,18 @@ data:
     - name: 'slack'
       slack_configs:
           - send_resolved: true
-            username: 'user'
-            channel: 'channel'
+            username: '###########'
+            channel: '#########'
             api_url: 'https://hooks.slack'
-            title: "{{ range .Alerts }}{{ .Annotations.summary }}{{ .Labels.severity }}\n{{ end }}"
-            text:  "{{ range .Alerts }}{{ .Annotations.description }}\n{{ end }}"
+            color: '{{ if eq .Status "firing" }}danger{{ else }}good{{ end }}'
+            title: '[{{ .Status | toUpper }}{{ if eq .Status "firing" }}:{{ .Alerts.Firing | len }}{{ end }}] Prometheus Event Notification'
+            title_link: '{{ template "slack.default.titlelink" . }}'
+            pretext: '{{ .CommonAnnotations.summary }}'
+            text: |-
+              {{ range .Alerts }}
+                {{- if .Annotations.summary }}*Alert:* {{ .Annotations.summary }} - `{{ .Labels.severity }}`{{- end }}
+                *Description:* {{ .Annotations.description }}{{ .Annotations.message }}
+                *Details:*
+                {{ range .Labels.SortedPairs }} • *{{ .Name }}:* `{{ .Value }}`
+                {{ end }}
+              {{ end }}

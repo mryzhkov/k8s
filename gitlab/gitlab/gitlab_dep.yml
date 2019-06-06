@@ -1,0 +1,66 @@
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  name: gitlab-app
+  namespace: gitlab
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        name: gitlab-app
+        app: gitlab
+    spec:
+      serviceAccountName: gitlab
+      containers:
+      - name: gitlab
+        image: 'gitlab/gitlab-ce:latest'
+        env:
+        - name: GITLAB_OMNIBUS_CONFIG
+          value: |
+            external_url 'https://gitlab'
+            nginx['enable'] = false
+            gitlab_rails['gitlab_ssh_host'] = "gitlab-app"
+            gitlab_rails['gitlab_shell_ssh_port'] = 22
+            postgresql['enable'] = false
+            gitlab_rails['db_adapter'] = "postgresql"
+            gitlab_workhorse['listen_network'] = 'tcp'
+            gitlab_workhorse['listen_addr'] = '0.0.0.0:8005'
+            gitlab_rails['db_adapter'] = "postgresql"
+            gitlab_rails['db_database'] = "gitlab_production"
+            gitlab_rails['db_username'] = "gitlab"
+            gitlab_rails['db_password'] = "#####"
+            gitlab_rails['db_host'] = "gitlab-postgresql"
+            gitlab_rails['db_port'] = 5432
+            redis['enable'] = false
+            gitlab_rails['redis_host'] = "gitlab-redis"
+            gitlab_rails['redis_port'] = 6379
+            gitlab_rails['redis_database'] = 0
+            registry_external_url 'https://registry'
+            registry_nginx['enable'] = false
+            gitlab_rails['registry_enabled'] = true
+            gitlab_rails['registry_issuer'] = "omnibus-gitlab-issuer"
+            registry['registry_http_addr'] = "gitlab-registry:5000"             
+        ports:
+        - name: http
+          containerPort: 8005
+        - name: ssh
+          containerPort: 22
+        volumeMounts:
+        - mountPath: /var/opt/gitlab
+          name: gitlab-data
+        resources:
+          requests:
+            memory: 2.5Gi
+          limits:
+            memory: 3.5Gi
+        
+      volumes:
+      - name: gitlab-data
+        persistentVolumeClaim:
+          claimName: gitlab-claim
+
+        
+       

@@ -1,0 +1,16 @@
+kind: Service
+apiVersion: v1
+metadata:
+  name: kube-scheduler-monitoring
+  namespace: kube-system
+  labels:
+    k8s-app: kube-scheduler
+    component: kube-scheduler
+spec:
+  selector:
+    component: kube-scheduler
+  ports:
+  - name: http-metrics
+    protocol: TCP
+    port: 10251
+    targetPort: 10251

@@ -29,12 +29,18 @@ spec:
           image: prom/prometheus
           args:
             - "--config.file=/etc/prometheus/prometheus.yml"
-            - "--storage.tsdb.path=/prometheus/"
             - "--web.enable-lifecycle"
-            - "--storage.tsdb.no-lockfile"
+            - "--storage.tsdb.path=/prometheus/"
           ports:
             - name: prometheus
               containerPort: 9090
+          resources:
+            limits:
+              cpu: 300m
+              memory: 1000Mi
+            requests:
+              cpu: 250m
+              memory: 800Mi
           readinessProbe:
             httpGet:
               path: /-/ready
@@ -71,6 +77,8 @@ kind: Service
 metadata:
   name: prometheus-service
   namespace: monitoring
+  labels:
+    app: prometheus-server
   annotations:
       prometheus.io/scrape: 'true'
 spec:

@@ -1,0 +1,57 @@
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  name: gitlab-registry
+  namespace: gitlab
+spec:
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: gitlab
+        name: gitlab-registry
+    spec:
+      containers:
+        - name: registry
+          image: registry:latest
+          env:
+            - name: REGISTRY_HTTP_SECRET
+              value: HelloWorld
+            - name: REGISTRY_HTTP_ADDR
+              value: ":5000"
+            - name: REGISTRY_STORAGE_FILESYSTEM_ROOTDIRECTORY
+              value: "/var/lib/registry"
+            - name: REGISTRY_AUTH_TOKEN_REALM
+              value: https://gitlab.automation-team.ru/jwt/auth
+            - name: REGISTRY_AUTH_TOKEN_SERVICE
+              value: container_registry
+            - name: REGISTRY_AUTH_TOKEN_ISSUER
+              value: omnibus-gitlab-issuer
+            - name: REGISTRY_AUTH_TOKEN_ROOTCERTBUNDLE
+              value: /certs/gitlab-registry.crt
+            - name: REGISTRY_STORAGE_DELETE_ENABLED
+              value: "true" 
+            #- name: REGISTRY_AUTH_HTPASSWD_REALM
+            #  value: basic_realm
+            #- name: REGISTRY_AUTH_HTPASSWD_PATH
+            #  value: /auth/htpasswd
+          ports:
+          - name: http
+            containerPort: 5000
+          volumeMounts:
+          - name: image-store
+            mountPath: "/var/lib/registry"
+          - name: auth-dir
+            mountPath: /auth
+          - name: gitlab-registry-crt
+            mountPath: /certs/
+      volumes:
+      - name: image-store
+        persistentVolumeClaim:
+          claimName: registry-claim
+      - name: auth-dir
+        secret: 
+          secretName: registry-auth-secret
+      - name: gitlab-registry-crt
+        secret:
+          secretName: gitlab-registry-crt

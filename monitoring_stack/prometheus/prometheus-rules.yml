@@ -273,4 +273,458 @@ data:
           BY (instance, cpu))
         record: cluster:node_cpu:ratio
 
+    - name: k8s-monitoring-components
+      rules:
+      - alert: AlertmanagerDown
+        annotations:
+          message: Alertmanager has disappeared from Prometheus target discovery.
+        expr: |
+          up{job="alertmanager"} == 0
+        for: 15m
+        labels:
+          severity: critical
+      - alert: CoreDNSDown
+        annotations:
+          message: CoreDNS has disappeared from Prometheus target discovery.
+        expr: |
+          up{job="kube-dns"} == 0
+        for: 3m
+        labels:
+          severity: critical
+      - alert: KubeAPIDown
+        annotations:
+          message: KubeAPI has disappeared from Prometheus target discovery.
+        expr: |
+          up{job="apiserver"} == 0
+        for: 3m
+        labels:
+          severity: critical
+      - alert: KubeControllerManagerDown
+        annotations:
+          message: KubeControllerManager has disappeared from Prometheus target discovery.
+        expr: |
+          up{job="kube-controller-manager"} == 0
+        for: 3m
+        labels:
+          severity: critical
+      - alert: KubeSchedulerDown
+        annotations:
+          message: KubeScheduler has disappeared from Prometheus target discovery.
+        expr: |
+          up{job="kube-scheduler"} == 0
+        for: 3m
+        labels:
+          severity: critical
+      - alert: KubeStateMetricsDown
+        annotations:
+          message: KubeStateMetrics has disappeared from Prometheus target discovery.
+        expr: |
+          up{job="kube-state-metrics"} == 0
+        for: 3m
+        labels:
+          severity: critical
+      - alert: KubeletDown
+        annotations:
+          message: Kubelet has disappeared from Prometheus target discovery.
+        expr: |
+          up{job="kubernetes-kubelet"} == 0
+        for: 3m
+        labels:
+          severity: critical
+      - alert: NodeExporterDown
+        annotations:
+          message: NodeExporter has disappeared from Prometheus target discovery.
+        expr: |
+          up{job="node-exporter"} == 0
+        for: 3m
+        labels:
+          severity: critical
+      - alert: PrometheusDown
+        annotations:
+          message: Prometheus has disappeared from Prometheus target discovery.
+        expr: |
+          up{job="prometheus"} == 0
+        for: 3m
+        labels:
+          severity: critical
+      - alert: CadvisorDown
+        annotations:
+          message: Cadvisor has disappeared from Prometheus target discovery.
+        expr: |
+          up{job="kubernetes-nodes-cadvisor"} == 0
+        for: 3m
+        labels:
+          severity: critical
 
+    - name: kubernetes-apps
+      rules:
+      - alert: KubePodCrashLooping
+        annotations:
+          message: Pod {{ $labels.namespace }}/{{ $labels.pod }} ({{ $labels.container
+            }}) is restarting {{ printf "%.2f" $value }} times / 5 minutes.
+        expr: |
+          rate(kube_pod_container_status_restarts_total{job="kube-state-metrics"}[15m]) * 60 * 5 > 0
+        for: 1h
+        labels:
+          severity: critical
+      - alert: KubePodNotReady
+        annotations:
+          message: Pod {{ $labels.namespace }}/{{ $labels.pod }} has been in a non-ready
+            state for longer than an hour.
+        expr: |
+          sum by (namespace, pod) (kube_pod_status_phase{job="kube-state-metrics", phase=~"Pending|Unknown"}) > 0
+        for: 1h
+        labels:
+          severity: critical
+      - alert: KubeDeploymentGenerationMismatch
+        annotations:
+          message: Deployment generation for {{ $labels.namespace }}/{{ $labels.deployment
+            }} does not match, this indicates that the Deployment has failed but has
+            not been rolled back.
+        expr: |
+          kube_deployment_status_observed_generation{job="kube-state-metrics"}
+            !=
+          kube_deployment_metadata_generation{job="kube-state-metrics"}
+        for: 15m
+        labels:
+          severity: critical
+      - alert: KubeDeploymentReplicasMismatch
+        annotations:
+          message: Deployment {{ $labels.namespace }}/{{ $labels.deployment }} has not
+            matched the expected number of replicas for longer than an hour.
+        expr: |
+          kube_deployment_spec_replicas{job="kube-state-metrics"}
+            !=
+          kube_deployment_status_replicas_available{job="kube-state-metrics"}
+        for: 1h
+        labels:
+          severity: critical
+      - alert: KubeStatefulSetReplicasMismatch
+        annotations:
+          message: StatefulSet {{ $labels.namespace }}/{{ $labels.statefulset }} has
+            not matched the expected number of replicas for longer than 15 minutes.
+        expr: |
+          kube_statefulset_status_replicas_ready{job="kube-state-metrics"}
+            !=
+          kube_statefulset_status_replicas{job="kube-state-metrics"}
+        for: 15m
+        labels:
+          severity: critical
+      - alert: KubeStatefulSetGenerationMismatch
+        annotations:
+          message: StatefulSet generation for {{ $labels.namespace }}/{{ $labels.statefulset
+            }} does not match, this indicates that the StatefulSet has failed but has
+            not been rolled back.
+        expr: |
+          kube_statefulset_status_observed_generation{job="kube-state-metrics"}
+            !=
+          kube_statefulset_metadata_generation{job="kube-state-metrics"}
+        for: 15m
+        labels:
+          severity: critical
+      - alert: KubeStatefulSetUpdateNotRolledOut
+        annotations:
+          message: StatefulSet {{ $labels.namespace }}/{{ $labels.statefulset }} update
+            has not been rolled out.
+        expr: |
+          max without (revision) (
+            kube_statefulset_status_current_revision{job="kube-state-metrics"}
+              unless
+            kube_statefulset_status_update_revision{job="kube-state-metrics"}
+          )
+            *
+          (
+            kube_statefulset_replicas{job="kube-state-metrics"}
+              !=
+            kube_statefulset_status_replicas_updated{job="kube-state-metrics"}
+          )
+        for: 15m
+        labels:
+          severity: critical
+      - alert: KubeDaemonSetRolloutStuck
+        annotations:
+          message: Only {{ $value }}% of the desired Pods of DaemonSet {{ $labels.namespace
+            }}/{{ $labels.daemonset }} are scheduled and ready.
+        expr: |
+          kube_daemonset_status_number_ready{job="kube-state-metrics"}
+            /
+          kube_daemonset_status_desired_number_scheduled{job="kube-state-metrics"} * 100 < 100
+        for: 15m
+        labels:
+          severity: critical
+      - alert: KubeDaemonSetNotScheduled
+        annotations:
+          message: '{{ $value }} Pods of DaemonSet {{ $labels.namespace }}/{{ $labels.daemonset
+            }} are not scheduled.'
+        expr: |
+          kube_daemonset_status_desired_number_scheduled{job="kube-state-metrics"}
+            -
+          kube_daemonset_status_current_number_scheduled{job="kube-state-metrics"} > 0
+        for: 10m
+        labels:
+          severity: warning
+      - alert: KubeDaemonSetMisScheduled
+        annotations:
+          message: '{{ $value }} Pods of DaemonSet {{ $labels.namespace }}/{{ $labels.daemonset
+            }} are running where they are not supposed to run.'
+        expr: |
+          kube_daemonset_status_number_misscheduled{job="kube-state-metrics"} > 0
+        for: 10m
+        labels:
+          severity: warning
+      - alert: KubeCronJobRunning
+        annotations:
+          message: CronJob {{ $labels.namespace }}/{{ $labels.cronjob }} is taking more
+            than 1h to complete.
+        expr: |
+          time() - kube_cronjob_next_schedule_time{job="kube-state-metrics"} > 3600
+        for: 1h
+        labels:
+          severity: warning
+      - alert: KubeJobCompletion
+        annotations:
+          message: Job {{ $labels.namespace }}/{{ $labels.job_name }} is taking more
+            than one hour to complete.
+        expr: |
+          kube_job_spec_completions{job="kube-state-metrics"} - kube_job_status_succeeded{job="kube-state-metrics"}  > 0
+        for: 1h
+        labels:
+          severity: warning
+      - alert: KubeJobFailed
+        annotations:
+          message: Job {{ $labels.namespace }}/{{ $labels.job_name }} failed to complete.
+        expr: |
+          kube_job_status_failed{job="kube-state-metrics"}  > 0
+        for: 1h
+        labels:
+          severity: warning
+    - name: kubernetes-resources
+      rules:
+      - alert: KubeCPUOvercommit
+        annotations:
+          message: Cluster has overcommitted CPU resource requests for Pods and cannot
+            tolerate node failure.
+        expr: |
+          sum(namespace_name:kube_pod_container_resource_requests_cpu_cores:sum)
+            /
+          sum(node:node_num_cpu:sum)
+            >
+          (count(node:node_num_cpu:sum)-1) / count(node:node_num_cpu:sum)
+        for: 5m
+        labels:
+          severity: warning
+      - alert: KubeMemOvercommit
+        annotations:
+          message: Cluster has overcommitted memory resource requests for Pods and cannot
+            tolerate node failure.
+        expr: |
+          sum(namespace_name:kube_pod_container_resource_requests_memory_bytes:sum)
+            /
+          sum(node_memory_MemTotal_bytes)
+            >
+          (count(node:node_num_cpu:sum)-1)
+            /
+          count(node:node_num_cpu:sum)
+        for: 5m
+        labels:
+          severity: warning
+      - alert: KubeCPUOvercommit
+        annotations:
+          message: Cluster has overcommitted CPU resource requests for Namespaces.
+        expr: |
+          sum(kube_resourcequota{job="kube-state-metrics", type="hard", resource="requests.cpu"})
+            /
+          sum(node:node_num_cpu:sum)
+            > 1.5
+        for: 5m
+        labels:
+          severity: warning
+      - alert: KubeMemOvercommit
+        annotations:
+          message: Cluster has overcommitted memory resource requests for Namespaces.
+        expr: |
+          sum(kube_resourcequota{job="kube-state-metrics", type="hard", resource="requests.memory"})
+            /
+          sum(node_memory_MemTotal_bytes{job="node-exporter"})
+            > 1.5
+        for: 5m
+        labels:
+          severity: warning
+      - alert: KubeQuotaExceeded
+        annotations:
+          message: Namespace {{ $labels.namespace }} is using {{ printf "%0.0f" $value
+            }}% of its {{ $labels.resource }} quota.
+        expr: |
+          100 * kube_resourcequota{job="kube-state-metrics", type="used"}
+            / ignoring(instance, job, type)
+          (kube_resourcequota{job="kube-state-metrics", type="hard"} > 0)
+            > 90
+        for: 15m
+        labels:
+          severity: warning
+    - name:  kubernetes-storage
+      rules:
+      - alert: KubePersistentVolumeUsageCritical
+        annotations:
+          message: The PersistentVolume claimed by {{ $labels.persistentvolumeclaim
+            }} in Namespace {{ $labels.namespace }} is only {{ printf "%0.2f" $value
+            }}% free.
+        expr: |
+          100 * kubelet_volume_stats_available_bytes{job="kubernetes-kubelet"}
+            /
+          kubelet_volume_stats_capacity_bytes{job="kubernetes-kubelet"}
+            < 3
+        for: 1m
+        labels:
+          severity: critical
+      - alert: KubePersistentVolumeFullInONEDays
+        annotations:
+          message: Based on recent sampling, the PersistentVolume claimed by {{ $labels.persistentvolumeclaim
+            }} in Namespace {{ $labels.namespace }} is expected to fill up within four
+            days. Currently {{ printf "%0.2f" $value }}% is available.
+        expr: |
+          100 * (
+            kubelet_volume_stats_available_bytes{job="kubernetes-kubelet"}
+              /
+            kubelet_volume_stats_capacity_bytes{job="kubernetes-kubelet"}
+          ) < 15
+          and
+          predict_linear(kubelet_volume_stats_available_bytes{job="kubernetes-kubelet"}[6h], 1 * 24 * 3600) < 0
+        for: 5m
+        labels:
+          severity: critical
+      - alert: KubePersistentVolumeErrors
+        annotations:
+          message: The persistent volume {{ $labels.persistentvolume }} has status {{
+            $labels.phase }}.
+        expr: |
+          kube_persistentvolume_status_phase{phase=~"Failed|Pending",job="kube-state-metrics"} > 0
+        for: 5m
+        labels:
+          severity: critical
+    - name: kubernetes-system
+      rules:
+      - alert: KubeNodeNotReady
+        annotations:
+          message: '{{ $labels.node }} has been unready for more than an hour.'
+        expr: |
+          kube_node_status_condition{job="kube-state-metrics",condition="Ready",status="true"} == 0
+        for: 1h
+        labels:
+          severity: warning
+      - alert: KubeVersionMismatch
+        annotations:
+          message: There are {{ $value }} different semantic versions of Kubernetes
+            components running.
+        expr: |
+          count(count by (gitVersion) (label_replace(kubernetes_build_info{job!="kube-dns"},"gitVersion","$1","gitVersion","(v[0-9]*.[0-9]*.[0-9]*).*"))) > 1
+        for: 1h
+        labels:
+          severity: warning
+      - alert: KubeClientErrors
+        annotations:
+          message: Kubernetes API server client '{{ $labels.job }}/{{ $labels.instance
+            }}' is experiencing {{ printf "%0.0f" $value }}% errors.'
+        expr: |
+          (sum(rate(rest_client_requests_total{code=~"5.."}[5m])) by (instance, job)
+            /
+          sum(rate(rest_client_requests_total[5m])) by (instance, job))
+          * 100 > 1
+        for: 15m
+        labels:
+          severity: warning
+      - alert: KubeClientErrors
+        annotations:
+          message: Kubernetes API server client '{{ $labels.job }}/{{ $labels.instance
+            }}' is experiencing {{ printf "%0.0f" $value }} errors / second.
+        expr: |
+          sum(rate(ksm_scrape_error_total{job="kube-state-metrics"}[5m])) by (instance, job) > 0.1
+        for: 15m
+        labels:
+          severity: warning
+      - alert: KubeletTooManyPods
+        annotations:
+          message: Kubelet {{ $labels.instance }} is running {{ $value }} Pods, close
+            to the limit of 110.
+        expr: |
+          kubelet_running_pod_count{job="kubelet"} > 110 * 0.9
+        for: 15m
+        labels:
+          severity: warning
+      - alert: KubeAPILatencyHigh
+        annotations:
+          message: The API server has a 99th percentile latency of {{ $value }} seconds
+            for {{ $labels.verb }} {{ $labels.resource }}.
+        expr: |
+          cluster_quantile:apiserver_request_latencies:histogram_quantile{job="apiserver",quantile="0.99",subresource!="log",verb!~"^(?:LIST|WATCH|WATCHLIST|PROXY|CONNECT)$"} > 1
+        for: 10m
+        labels:
+          severity: warning
+      - alert: KubeAPILatencyHigh
+        annotations:
+          message: The API server has a 99th percentile latency of {{ $value }} seconds
+            for {{ $labels.verb }} {{ $labels.resource }}.
+        expr: |
+          cluster_quantile:apiserver_request_latencies:histogram_quantile{job="apiserver",quantile="0.99",subresource!="log",verb!~"^(?:LIST|WATCH|WATCHLIST|PROXY|CONNECT)$"} > 4
+        for: 10m
+        labels:
+          severity: critical 
+    - name: prometheus.rules
+      rules:
+      - alert: PrometheusConfigReloadFailed
+        annotations:
+          description: Reloading Prometheus' configuration has failed for {{$labels.namespace}}/{{$labels.pod}}
+          summary: Reloading Prometheus' configuration failed
+        expr: |
+          prometheus_config_last_reload_successful{job="prometheus"} == 0
+        for: 1m
+        labels:
+          severity: warning
+    - name: nodes-alert.rules
+      rules:
+      - alert: NodeLowDisk
+        annotations:
+          summary: "{{$labels.node}}: Low  disk space"
+          description: "{{$labels.node}}: Disk usage is above 75% (current value is: {{ $value }})"
+        expr: |
+          ((node_filesystem_size_bytes{mountpoint="/"} - node_filesystem_free_bytes{mountpoint="/"} ) / node_filesystem_size_bytes{mountpoint="/"} * 100) > 75
+        for: 5m
+        labels:
+          severity: critical
+      - alert: NodeLoadAverage
+        annotations:
+          summary: "{{$labels.node}}: High LA detected"
+          description:  "{{$labels.node}}: LA is high"
+        expr: |
+          ((node_load5 / count without (cpu, mode) (node_cpu_seconds_total{mode="system"})) > 5)
+        for: 5m
+        labels:
+          severity: critical
+      - alert: NodeMemoryUsage
+        annotations:
+          summary: "{{$labels.node}}: High memory usage detected"
+          description: "{{$labels.node}}: Memory usage is above 75% (current value is: {{ $value }})"
+        expr: |
+          (((node_memory_MemTotal_bytes - node_memory_MemFree_bytes - node_memory_Cached_bytes)/(node_memory_MemTotal_bytes)*100)) > 80
+        for: 5m
+        labels:
+          severity: critical
+      - alert: NodeCPUUsage
+        annotations:
+          summary: "{{$labels.node}}: High CPU usage detected"
+          description: "{{$labels.node}}: CPU usage is above 75% (current value is: {{ $value }})"
+        expr: |
+          (100 - (avg by (instance) (irate(node_cpu_seconds_total{job="node-exporter",mode="idle"}[5m])) * 100)) > 75
+        for: 5m
+        labels:
+          severity: critical
+      - alert: NodeLowInodes
+        annotations:
+          summary: "Out of inodes (instance {{ $labels.node }})"
+          description: "Disk is almost running out of available inodes (< 10% left)\n  VALUE = {{ $value }}\n  LABELS: {{ $labels }}"
+        expr: |
+          (node_filesystem_files_free{device="/dev/sda1",mountpoint ="/"} / node_filesystem_files{device="/dev/sda1",mountpoint ="/"} * 100) < 10
+        for: 5m
+        labels:
+          severity: critical
+         

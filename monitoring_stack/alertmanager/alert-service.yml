@@ -4,15 +4,13 @@ metadata:
   annotations:
     prometheus.io/scrape: 'true'
     prometheus.io/path: '/metrics'
-#    cloud.google.com/load-balancer-type: "Internal"
   labels:
-    name: alertmanager
+    app: alertmanager
   name: alertmanager
   namespace: monitoring
 spec:
   selector:
     app: alertmanager
-#  type: LoadBalancer
   ports:
   - name: alertmanager
     protocol: TCP

@@ -1,0 +1,125 @@
+# RBAC authn and authz
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: elasticsearch-logging
+  namespace: logging
+  labels:
+    app: elasticsearch-logging
+---
+kind: ClusterRole
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: elasticsearch-logging
+  labels:
+    app: elasticsearch-logging
+rules:
+- apiGroups:
+  - ""
+  resources:
+  - "services"
+  - "namespaces"
+  - "endpoints"
+  verbs:
+  - "get"
+---
+kind: ClusterRoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  namespace: logging
+  name: elasticsearch-logging
+  labels:
+    app: elasticsearch-logging
+subjects:
+- kind: ServiceAccount
+  name: elasticsearch-logging
+  namespace: logging
+  apiGroup: ""
+roleRef:
+  kind: ClusterRole
+  name: elasticsearch-logging
+  apiGroup: ""
+---
+# Elasticsearch deployment itself
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: elasticsearch-logging
+  namespace: logging
+  labels:
+    app: elasticsearch-logging
+spec:
+  serviceName: elasticsearch-logging
+  replicas: 1
+  selector:
+    matchLabels:
+      app: elasticsearch-logging
+  template:
+    metadata:
+      labels:
+        app: elasticsearch-logging
+    spec:
+      serviceAccountName: elasticsearch-logging
+      containers:
+      - image: elasticsearch:7.1.1
+        name: elasticsearch-logging
+        resources:
+          # need more cpu upon initialization, therefore burstable class
+          limits:
+            cpu: 1000m
+            memory: 2Gi
+          requests:
+            cpu: 100m
+            memory: 1.5Gi
+        ports:
+        - containerPort: 9300
+          name: transport
+          protocol: TCP
+        - containerPort: 9200
+          name: db
+          protocol: TCP
+        volumeMounts:
+        - name: elasticsearch-logging
+          mountPath: /data
+        env:
+        - name: ES_JAVA_OPTS
+          value: -Xms512m -Xmx512m
+        - name: network.host
+          value: 0.0.0.0
+        - name: discovery.type
+          value: single-node
+        - name: transport.host
+          value: localhost
+        - name: transport.tcp.port
+          value: "9300"
+        - name: http.port
+          value: "9200"
+        volumeMounts:
+        - name: elastic-storage-volume
+          mountPath: /usr/share/elasticsearch/data
+      volumes: 
+        - name: elastic-storage-volume
+          persistentVolumeClaim:
+            claimName: elastic-claim 
+
+      initContainers:
+      - image: alpine:3.6
+        command: ["/sbin/sysctl", "-w", "vm.max_map_count=262144"]
+        name: elasticsearch-logging-init
+        securityContext:
+          privileged: true
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: elasticsearch-logging
+  namespace: logging
+  labels:
+    app: elasticsearch-logging
+spec:
+  ports:
+  - port: 9200
+    protocol: TCP
+    targetPort: db
+  selector:
+    app: elasticsearch-logging

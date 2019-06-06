@@ -1,0 +1,16 @@
+kind: Service
+apiVersion: v1
+metadata:
+  name: kube-dns-monitoring
+  namespace: kube-system
+  labels:
+    k8s-app: kube-dns
+    component: kube-dns
+spec:
+  selector:
+    k8s-app: kube-dns
+  ports:
+  - name: http-metrics
+    protocol: TCP
+    port: 9153
+    targetPort: 9153

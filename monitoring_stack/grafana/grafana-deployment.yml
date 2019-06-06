@@ -49,7 +49,18 @@ spec:
           readOnly: false
         - mountPath: /grafana-dashboard-definitions/k8s-cluster-monitoring
           name: grafana-dashboard-k8s-cluster-monitoring
-          readOnly: false
+          readOnly: false 
+        readinessProbe:
+          httpGet:
+            path: /api/health
+            port: http
+        resources:
+          limits:
+            cpu: 200m
+            memory: 200Mi
+          requests:
+            cpu: 100m
+            memory: 100Mi
 
       securityContext:
         runAsNonRoot: true

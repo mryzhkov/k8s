@@ -1,0 +1,14 @@
+kind: Service
+apiVersion: v1
+metadata:
+  name: gitlab-registry
+  namespace: gitlab
+  labels:
+    app: gitlab
+    name: gitlab-registry
+spec:
+  selector:
+    name: gitlab-registry
+  ports:
+  - name: http
+    port: 5000
