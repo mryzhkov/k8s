@@ -1,0 +1,55 @@
+---
+- hosts: all
+  become: yes
+  tasks:
+  - name: createdir
+    shell: mkdir /opt/gluster-volume
+  - name: install gluster
+    yum:
+      name: centos-release-gluster6
+      state: present
+      update_cache: true
+  - name: install glusterfs-server
+    yum:
+      name: glusterfs-server
+      state: present
+      update_cache: true
+
+  - name: start gluserd
+    service:
+      name: glusterd
+      enabled: yes
+      state: started
+  - name: add gluster servers
+    command: "{{ item }}"
+    with_items:
+    - gluster peer probe k8s-master
+    - gluster peer probe k8s-worker1
+    - gluster peer probe k8s-worker2
+
+- hosts: k8s-master
+  become: yes
+  tasks:
+  - name: create replics
+    shell: gluster volume create gfs replica 3
+
+  - name: activate tom
+    shell: sudo gluster volume start gfs
+
+  - name: auth gfs
+    shell: gluster volume set gfs auth.allow 10.127.20.64,10.127.20.65,10.127.20.76
+
+- hosts: all
+  become: yes
+  tasks:
+  - name: mount
+    command: "{{ item }}"
+    with_items:
+    - mkdir /mnt/gluster
+    - mount.glusterfs localhost:/gfs /mnt/gluster
+
+  - name: enable fstab
+    command: echo 'localhost:/gfs /mnt/gluster glusterfs defaults,_netdev,backupvolfile-server=localhost 0 0' | sudo tee -a /etc/fstab
+
+
+    
